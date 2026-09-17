@@ -25,7 +25,11 @@ Restano i tetti di spesa e il contenuto dei documenti FOIA.
 - [x] **Interfaccia unica** (21/08/2026) — il widget della home parla con `/api/mitl`
       e vede tutte le fonti. Serviva anche rendere cliccabili i link delle citazioni:
       il widget scappava tutto e i markdown uscivano come testo grezzo. `/dati/`
-      reindirizza alla home portandosi dietro il codice.
+      reindirizza alla home.
+- [x] **MARLA riservata ai soci** (17/09/2026) — si entra dall'Area soci del sito con
+      un lasciapassare firmato, come FOIA Tracker; il codice condiviso `#codice=…`
+      non vale più. Chiuso anche il vecchio `/api/chat`, che era aperto a chiunque.
+      Vedi CLAUDE.md, "Accesso".
 - [x] **FOIA Tracker collegato** (21/08/2026) — prima fonte `interno`, letta dal vivo
       dal Google Sheet perché questo repo è pubblico e un indice committato sarebbe
       leggibile da chiunque. La colonna EMAIL non esce mai. Contiene i **metadati**

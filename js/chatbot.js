@@ -5,22 +5,24 @@
    Due differenze rispetto alla versione precedente, che chiamava /api/chat:
    - le risposte contengono citazioni in markdown, quindi i link vanno resi
      cliccabili invece che scappati come testo;
-   - l'endpoint richiede un codice d'accesso, che arriva dal frammento
-     dell'indirizzo (#codice=…) e resta memorizzato su questo browser. */
+   - MARLA è riservata ai soci di info.nodes: si entra dall'Area soci del sito,
+     che apre qui una sessione (cookie). Senza sessione la pagina rimanda lì.
+     Vedi api/lib/accesso.js.
 
-const ENDPOINT = 'https://marlamag.vercel.app/api/mitl';
-const CHIAVE_CODICE = 'marla-codice';
+   Il cookie vale solo su marlamag.vercel.app: le copie della pagina su altri
+   indirizzi (GitHub Pages) non possono parlare con MARLA e rimandano là. */
+
+const CASA = 'https://marlamag.vercel.app';
+const SU_VERCEL = location.origin === CASA || /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+const ENDPOINT = '/api/mitl';
 
 const BENVENUTO = `Ciao, sono MARLA. Ho davanti l'archivio di info.nodes — newsletter, pubblicazioni, inchieste, report di altre organizzazioni — e il database Man in the Loop sui finanziamenti alle armi autonome. Posso incrociarli, e ti dico sempre da dove viene ogni cosa. Se non c'è, te lo dico e basta.`;
-
-const CHIEDI_CODICE = `Prima però serve il codice di accesso. Scrivilo qui sotto.`;
 
 class InfonodesChat {
   constructor() {
     this.messages = [];
     this.isTyping = false;
-    this.codice = null;
-    this.attendoCodice = false;
+    this.pronta = false;
     this.init();
   }
 
@@ -30,53 +32,44 @@ class InfonodesChat {
     this.input = document.getElementById('chat-input');
     if (!this.messagesEl || !this.form) return;
 
-    this.codice = this.leggiCodice();
-
-    this.addMessage('bot', BENVENUTO);
-    if (!this.codice) {
-      this.addMessage('bot', CHIEDI_CODICE);
-      this.attendoCodice = true;
-      if (this.input) this.input.placeholder = 'codice di accesso…';
-    }
+    this.controllaAccesso();
 
     this.form.addEventListener('submit', (e) => {
       e.preventDefault();
       const text = this.input.value.trim();
-      if (!text || this.isTyping) return;
+      if (!text || this.isTyping || !this.pronta) return;
       this.input.value = '';
-      if (this.attendoCodice) return this.salvaCodice(text);
       if (/^\/config(urazione)?$/i.test(text)) return this.controllaConfigurazione();
       this.send(text);
     });
   }
 
-  /* Il codice può arrivare nel link condiviso (#codice=…) — così chi lo riceve
-     entra senza digitare — oppure essere già memorizzato da una visita
-     precedente. Nel primo caso lo togliamo subito dalla barra dell'indirizzo. */
-  leggiCodice() {
-    const m = location.hash.match(/(?:^#|&)codice=([^&]+)/);
-    if (m) {
-      const c = decodeURIComponent(m[1]);
-      try { localStorage.setItem(CHIAVE_CODICE, c); } catch (e) {}
-      history.replaceState(null, '', location.pathname + location.search);
-      return c;
+  /* Chi apre la pagina senza essere entrato dall'Area soci viene mandato lì:
+     se ha già fatto il login, il sito lo rimanda subito indietro. Ci pensa il
+     server a dire dove (api/sessione.js), così l'indirizzo del sito sta in un
+     posto solo. */
+  async controllaAccesso() {
+    if (!SU_VERCEL) {
+      return this.addMessage('bot', `Da qui non posso rispondere. MARLA è riservata ai soci di info.nodes: [aprila qui](${CASA}/).`);
     }
-    try { return localStorage.getItem(CHIAVE_CODICE); } catch (e) { return null; }
+    if (this.input) this.input.placeholder = 'un attimo…';
+    try {
+      const res = await fetch('/api/sessione', { credentials: 'same-origin', cache: 'no-store' });
+      const d = await res.json().catch(() => ({}));
+      if (res.status === 401 && d.ingresso) return this.vaiAllIngresso(d.ingresso);
+      if (!res.ok) return this.addMessage('bot', d.error || `Errore ${res.status}.`);
+      this.addMessage('bot', BENVENUTO);
+      this.pronta = true;
+      if (this.input) { this.input.placeholder = 'scrivi qui…'; this.input.focus(); }
+    } catch (e) {
+      this.addMessage('bot', 'Non riesco a raggiungere il server: ' + e.message);
+    }
   }
 
-  salvaCodice(c) {
-    this.codice = c;
-    try { localStorage.setItem(CHIAVE_CODICE, c); } catch (e) {}
-    this.attendoCodice = false;
-    if (this.input) this.input.placeholder = 'scrivi qui…';
-    this.addMessage('bot', 'Fatto. Chiedimi pure.');
-  }
-
-  dimenticaCodice() {
-    try { localStorage.removeItem(CHIAVE_CODICE); } catch (e) {}
-    this.codice = null;
-    this.attendoCodice = true;
-    if (this.input) this.input.placeholder = 'codice di accesso…';
+  vaiAllIngresso(indirizzo) {
+    this.pronta = false;
+    this.addMessage('bot', `MARLA è riservata ai soci di info.nodes. Ti porto all'[Area soci](${indirizzo})…`);
+    location.href = indirizzo;
   }
 
   addMessage(role, text, extra) {
@@ -139,12 +132,13 @@ class InfonodesChat {
       const res = await fetch(ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: this.codice, controlla: 'configurazione' })
+        credentials: 'same-origin',
+        body: JSON.stringify({ controlla: 'configurazione' })
       });
       const d = await res.json().catch(() => ({}));
       this.hideTyping();
 
-      if (res.status === 401) { this.dimenticaCodice(); return this.addMessage('bot', 'Il codice non va bene. Riscrivilo.'); }
+      if (res.status === 401 && d.ingresso) return this.vaiAllIngresso(d.ingresso);
       if (!res.ok) return this.addMessage('bot', d.error || `Errore ${res.status}.`);
 
       const righe = Object.entries(d)
@@ -170,16 +164,16 @@ class InfonodesChat {
       const res = await fetch(ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: this.messages, token: this.codice })
+        credentials: 'same-origin',
+        body: JSON.stringify({ messages: this.messages })
       });
       const data = await res.json().catch(() => ({}));
       this.hideTyping();
 
-      if (res.status === 401) {
-        this.dimenticaCodice();
+      // La sessione dura 7 giorni: se è scaduta a metà conversazione, si rientra.
+      if (res.status === 401 && data.ingresso) {
         this.messages.pop();
-        this.addMessage('bot', 'Il codice non va bene. Riscrivilo.');
-        return;
+        return this.vaiAllIngresso(data.ingresso);
       }
       if (!res.ok) {
         this.messages.pop();

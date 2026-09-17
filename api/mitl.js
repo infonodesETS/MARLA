@@ -12,17 +12,20 @@
  *
  * Variabili d'ambiente:
  *   ANTHROPIC_API_KEY   obbligatoria
- *   MITL_CHAT_TOKEN     obbligatoria — codice d'accesso, senza il quale l'endpoint rifiuta
+ *   STRUMENTI_SECRET    obbligatoria — firma dell'accesso dei soci, identica a quella
+ *                       del sito info.nodes (vedi api/lib/accesso.js). Senza, nessuno entra
  *   MITL_INDEX_URL      facoltativa — dove leggere l'indice Man in the Loop
  *   MITL_MODELLO        facoltativa — default claude-sonnet-5
  *   UPSTASH_REDIS_REST_URL / _TOKEN   facoltative — se presenti, limita le chiamate
  */
 
+const crypto = require('crypto');
 const Anthropic = require('@anthropic-ai/sdk');
 const manintheloop = require('./fonti/manintheloop');
 const archivio = require('./fonti/archivio');
 const foia = require('./fonti/foia');
 const citazioni = require('./lib/citazioni');
+const accesso = require('./lib/accesso');
 
 const MODELLO      = process.env.MITL_MODELLO || 'claude-sonnet-5';
 // Il tetto vale per OGNI chiamata, non per la risposta finale, e in una
@@ -32,12 +35,12 @@ const MODELLO      = process.env.MITL_MODELLO || 'claude-sonnet-5';
 // token che usi, non il tetto — mentre tenerlo basso costa una risposta persa.
 const MAX_TOKENS   = 8000;
 const MAX_GIRI     = 8;      // quante volte il modello può richiamare strumenti
-const LIMITE_ORA   = 60;     // chiamate all'ora per token d'accesso
+const LIMITE_ORA   = 60;     // chiamate all'ora per socio
 
 // Registro delle fonti. Aggiungerne una significa aggiungere una riga.
 const FONTI = [manintheloop, archivio, foia];
 
-// Questa porta richiede il codice, quindi chi entra vede anche le fonti
+// Questa porta è riservata ai soci, quindi chi entra vede anche le fonti
 // `interno`. Il giorno in cui esisterà una porta pubblica dovrà passare
 // 'pubblico': le fonti interne non verranno proprio caricate, non filtrate dopo.
 const VISIBILITA_PORTA = 'interno';
@@ -230,21 +233,24 @@ async function conversa(client, messages, consentiti, traccia, diag) {
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 module.exports = async function handler(req, res) {
-  // Nessun CORS aperto: questa porta risponde solo a chi ha il codice.
+  // Nessun CORS aperto: questa porta risponde solo ai soci entrati dall'Area
+  // soci del sito. Il cookie di sessione è SameSite=Lax, quindi un altro sito
+  // non può farlo viaggiare con una sua richiesta POST.
   res.setHeader('Cache-Control', 'no-store');
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'Metodo non consentito' });
 
-  const atteso = process.env.MITL_CHAT_TOKEN;
-  if (!atteso) return res.status(503).json({ error: 'Accesso non configurato' });
+  if (!accesso.segretoPresente()) return res.status(503).json({ error: 'Accesso non configurato' });
 
-  const { messages, token } = req.body || {};
-  if (token !== atteso) return res.status(401).json({ error: 'Codice di accesso non valido' });
+  const socio = accesso.richiediSocio(req, res);
+  if (!socio) return;
+
+  const { messages } = req.body || {};
 
   // Controllo di configurazione: dice QUALI variabili risultano impostate, mai
   // il loro contenuto. Serve a distinguere "non l'ho messa" da "l'ho messa ma
   // non ho ridistribuito" senza dover leggere i log di Vercel.
-  // Uso:  POST {"token":"…","controlla":"configurazione"}
+  // Uso:  POST {"controlla":"configurazione"}
   if (req.body && req.body.controlla === 'configurazione') {
     const presente = n => {
       const v = process.env[n];
@@ -252,7 +258,7 @@ module.exports = async function handler(req, res) {
     };
     return res.status(200).json({
       ANTHROPIC_API_KEY:      presente('ANTHROPIC_API_KEY'),
-      MITL_CHAT_TOKEN:        presente('MITL_CHAT_TOKEN'),
+      STRUMENTI_SECRET:       presente('STRUMENTI_SECRET'),
       MITL_INDEX_URL:         presente('MITL_INDEX_URL'),
       GOOGLE_SPREADSHEET_ID:  presente('GOOGLE_SPREADSHEET_ID'),
       GOOGLE_CLIENT_EMAIL:    presente('GOOGLE_CLIENT_EMAIL'),
@@ -268,7 +274,8 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: 'messages mancante o vuoto' });
   }
 
-  if (await superaLimite(String(token).slice(0, 12))) {
+  const chiaveLimite = crypto.createHash('sha256').update(socio.email.toLowerCase()).digest('hex').slice(0, 16);
+  if (await superaLimite(chiaveLimite)) {
     return res.status(429).json({ error: 'Troppe domande in un\'ora. Riprova più tardi.' });
   }
 

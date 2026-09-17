@@ -8,6 +8,9 @@
       "maxDuration": 300
     }
   },
+  "rewrites": [
+    { "source": "/entra", "destination": "/api/entra" }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",

@@ -4,6 +4,7 @@
  */
 
 const Anthropic = require('@anthropic-ai/sdk');
+const accesso = require('./lib/accesso');
 
 const KB_URL = 'https://infonodesets.github.io/MARLA/kb.json';
 const MODELLO = 'claude-haiku-4-5';
@@ -173,6 +174,10 @@ module.exports = async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Metodo non consentito' });
+
+  // Vecchio endpoint, non più usato dal sito: resta solo per i soci, come
+  // api/mitl.js. Prima era aperto a chiunque e consumava credito.
+  if (!accesso.richiediSocio(req, res)) return;
 
   try {
     const { messages } = req.body;

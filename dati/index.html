@@ -8,11 +8,7 @@
 // C'è una sola interfaccia per parlare con MARLA: la home. Questa pagina era
 // la porta separata del chatbot sui dati, ora confluito lì dentro. Resta come
 // rimando, perché il link era già stato condiviso.
-// Il codice, se presente nel frammento, viaggia con il reindirizzamento.
-(function () {
-  var m = location.hash.match(/(?:^#|&)codice=([^&]+)/);
-  location.replace('/' + (m ? '#codice=' + m[1] : ''));
-})();
+location.replace('/');
 </script>
 <style>
   body { background:#0a0a1a; color:#00ff41; font-family:'Courier New',monospace;

@@ -7,7 +7,7 @@ Ospita un archivio di materiali e il chatbot MARLA alimentato da Claude API.
 **Repository pubblico:** https://github.com/infonodesETS/MARLA
 **Sito live:** https://infonodesets.github.io/MARLA/
 **Dominio attuale:** https://www.infonodes.org/ (su Register.it — ancora attivo, non toccare)
-**Chatbot backend:** https://marlamag.vercel.app/api/chat
+**MARLA:** https://marlamag.vercel.app/ — **riservata ai soci di info.nodes** (vedi "Accesso")
 
 ## Utente
 - Non programmatore, lavora da Windows 11
@@ -103,7 +103,7 @@ C'è **una sola interfaccia**: la home, `marlamag.vercel.app/`. Il widget parla 
 online e senza limiti di chiamate.
 
 - `js/chatbot.js` — il widget. Rende i link delle citazioni (il vecchio scappava
-  tutto), chiede il codice, e accetta **`/config`**: mostra quali variabili
+  tutto), controlla che chi apre la pagina sia un socio, e accetta **`/config`**: mostra quali variabili
   d'ambiente il deploy in esecuzione vede davvero, mai i valori.
 - `api/mitl.js` — l'agente. Il modello ha **strumenti** e decide quali chiamare:
   serve perché "questa società ha investitori cileni?" richiede due passaggi
@@ -121,10 +121,33 @@ online e senza limiti di chiamate.
 Regola che regge tutto: il modello può citare solo id e URL che gli strumenti gli
 hanno davvero restituito. È verificato dal codice, non chiesto nel prompt.
 
-Ogni fonte dichiara `pubblico` o `interno`. Oggi la porta è una sola e richiede il
-codice, quindi `VISIBILITA_PORTA = 'interno'` e si vedono tutte e tre le fonti (14
-strumenti). Con il codice tolto sarebbero 11: le fonti interne **non verrebbero
+Ogni fonte dichiara `pubblico` o `interno`. Oggi la porta è una sola ed è riservata
+ai soci, quindi `VISIBILITA_PORTA = 'interno'` e si vedono tutte e tre le fonti.
+Una porta pubblica dovrebbe passare 'pubblico': le fonti interne **non verrebbero
 caricate**, non filtrate dopo.
+
+### Accesso: solo soci (dal 17/09/2026)
+
+MARLA non ha login proprio. Si entra dall'**Area soci del sito info.nodes**, lo
+stesso meccanismo di FOIA Tracker:
+
+1. il socio clicca MARLA nell'Area soci; il sito (`/area-soci/vai`) gli consegna
+   un **lasciapassare** firmato, valido un minuto e intestato a marlamag;
+2. `/entra` (`api/entra.js`, pubblicato con un rewrite in `vercel.json`) lo
+   verifica e apre una sessione di 7 giorni nel cookie `soci_strumento`;
+3. `api/mitl.js` e il vecchio `api/chat.js` rispondono solo con quel cookie;
+   `api/sessione.js` dice alla pagina se il socio è entrato, e se no dove
+   mandarlo.
+
+Il codice sta in `api/lib/accesso.js`, che è la copia di `lib/accesso.ts` di
+foia.nodes: il formato del lasciapassare è deciso da `lib/passaggio.ts` nel repo
+del sito, e se cambia là va cambiato in tutti e due.
+
+Il sito rilascia il lasciapassare solo agli strumenti che nel Foglio "CONTENUTI
+SITO" (scheda Strumenti) hanno **Accesso = soci**: se la riga di MARLA torna
+"libero", i soci non riescono più a entrare. La pagina su GitHub Pages non può
+parlare con MARLA (il cookie vale solo su marlamag) e rimanda lì. Il vecchio
+codice condiviso `#codice=…` non vale più.
 
 ### Tempi
 
@@ -144,9 +167,12 @@ strumento — se il tetto scatta lì, la chiamata resta troncata e il giro si pe
 
 ## Variabili d'ambiente Vercel
 - ANTHROPIC_API_KEY — chiave API Anthropic
-- MITL_CHAT_TOKEN — codice d'accesso alla chat. Senza, l'endpoint risponde 503 a
-  chiunque. Si condivide come `marlamag.vercel.app/#codice=…`: chi apre quel link
-  entra senza digitare, e il codice sparisce dalla barra dell'indirizzo
+- STRUMENTI_SECRET — firma dell'accesso dei soci. **Identica** a quella del sito
+  e di foia-nodes. Senza, MARLA risponde 503 a chiunque: chiusa, non aperta
+- SITO_SOCI_URL — facoltativa, dove mandare chi non è entrato. Default
+  `https://infonodes-new-website.vercel.app`; **dopo il cambio di dominio va
+  impostata a `https://www.infonodes.org`**
+- MITL_CHAT_TOKEN — il vecchio codice d'accesso: non è più usato, si può cancellare
 - MITL_INDEX_URL — dove leggere l'indice Man in the Loop. **Punta al branch
   `eu-funding` finché non viene fatto il merge su `main`**: dopo il merge va
   cambiata in `https://infonodesets.github.io/manintheloop/data/mitl-index.json`,
