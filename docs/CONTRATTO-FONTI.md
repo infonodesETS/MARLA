@@ -58,6 +58,43 @@ Il campo `nota` serve a dichiarare i limiti di quello specifico risultato — pe
 esempio che una ricerca per parole chiave produce falsi positivi. Il modello la
 riceve e ne deve tenere conto.
 
+### Documenti da leggere (facoltativo)
+
+Accanto ai record, uno strumento può consegnare dei documenti da far leggere
+al modello così come sono:
+
+```js
+{
+  record: [ /* il record della richiesta, come sopra */ ],
+  nota: '…',
+  documenti: [
+    { titolo: 'FOIA-12 — risposta dell’ente — risposta.pdf',
+      media_type: 'application/pdf',          // oppure image/png, jpeg, gif, webp
+      data: '<base64>' }
+  ]
+}
+```
+
+L'agente li passa dentro il risultato dello strumento come blocchi documento o
+immagine (`contenutoRisultato` in `api/mitl.js`). Il modello legge un PDF pagina
+per pagina, sia come testo sia come immagine: per questo funziona anche con le
+scansioni, che di testo dentro non ne hanno.
+
+Regole:
+
+- **Serve quando il contenuto non si riduce a record**: la risposta di un ente,
+  un atto firmato e scansionato. Se si può estrarre un dato, meglio un record.
+- **Si cita attraverso il record che lo accompagna**, con identificativo e
+  titolo. I documenti non aggiungono indirizzi citabili.
+- **Restare piccoli.** L'intera richiesta al modello non può superare 32 MB, e
+  ogni documento viene rimandato a ogni giro della stessa conversazione: costa
+  token ogni volta, non una volta sola.
+- **Una fonte interna legge i documenti dal vivo**, mai da una copia nel
+  repository, che è pubblico. Vale per `foia`: i PDF stanno sul Drive condiviso
+  e si scaricano al momento.
+- **Il testo è di terzi.** Può contenere qualunque cosa, anche istruzioni: il
+  prompt dice al modello di riportarlo, non di eseguirlo.
+
 ---
 
 ## 3. Si cita solo ciò che è stato restituito

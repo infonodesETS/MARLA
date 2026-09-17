@@ -108,7 +108,11 @@ online e senza limiti di chiamate.
 - `api/mitl.js` — l'agente. Il modello ha **strumenti** e decide quali chiamare:
   serve perché "questa società ha investitori cileni?" richiede due passaggi
   concatenati che nessuna ricerca testuale può fare.
-- `api/fonti/` — una fonte per file: `manintheloop.js`, `archivio.js`, `foia.js`
+- `api/fonti/` — una fonte per file: `manintheloop.js`, `archivio.js`, `foia.js`.
+  Dal 17/09/2026 `foia.js` legge anche il **testo dei documenti allegati** alle
+  richieste — risposte degli enti e riesami, in genere PDF, spesso scansioni —
+  con lo strumento `foia_documenti`: li scarica dal Drive condiviso e li passa al
+  modello, che li legge pagina per pagina. Niente viene copiato nel repository
 - `api/lib/citazioni.js` — il controllo delle citazioni, con i suoi test
   (`node api/lib/citazioni.test.js`, gira senza npm install)
 - `docs/CONTRATTO-FONTI.md` — **da leggere prima di aggiungere una fonte**
@@ -143,6 +147,11 @@ strumento — se il tetto scatta lì, la chiamata resta troncata e il giro si pe
 - GOOGLE_SPREADSHEET_ID, GOOGLE_CLIENT_EMAIL, GOOGLE_PRIVATE_KEY — fonte FOIA,
   stessi valori del progetto foia.nodes. **GOOGLE_SHEET_NAME va lasciata vuota**:
   il nome del foglio viene chiesto all'API.
+  Il service account deve poter leggere **anche il Drive condiviso "Foia.nodes
+  Archive"**, dove foia.nodes carica gli allegati: se `foia_documenti` risponde
+  "documento non leggibile sul Drive", è lì che manca il permesso. Ogni chiamata
+  a Google ha un tempo massimo di 15 secondi, così un Google lento non fa
+  scadere i 60 secondi della funzione.
   La chiave privata si copia da `service-account.json` per intero, da
   `-----BEGIN PRIVATE KEY-----` a `-----END PRIVATE KEY-----`, lasciando le
   sequenze di escape a-capo così come sono (nel file appaiono come barra + n):
