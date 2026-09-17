@@ -193,8 +193,10 @@ async function conversa(client, messages, consentiti, traccia, diag) {
 
     messages.push({ role: 'assistant', content: risposta.content });
 
-    const esiti = [];
-    for (const c of chiamate) {
+    // Le chiamate di uno stesso turno partono insieme: quando il modello chiede
+    // più documenti in una volta, scaricarli uno dopo l'altro sommava i tempi.
+    // I risultati restano nell'ordine delle chiamate.
+    const esiti = await Promise.all(chiamate.map(async (c) => {
       traccia.push({ strumento: c.name, argomenti: c.input });
       try {
         const fonte = fonteDelloStrumento(c.name);
@@ -202,23 +204,23 @@ async function conversa(client, messages, consentiti, traccia, diag) {
         const esito = await fonte.esegui(c.name, c.input);
         citazioni.raccogli(esito.record || [], consentiti);
         if (diag && esito.documenti?.length) diag.documenti = (diag.documenti || 0) + esito.documenti.length;
-        esiti.push({
+        return {
           type: 'tool_result',
           tool_use_id: c.id,
           content: contenutoRisultato(esito),
-        });
+        };
       } catch (e) {
         // L'errore va anche nella diagnostica: al modello serve per non
         // inventare, a chi usa MARLA serve per capire cosa aggiustare. Senza,
         // arriva solo un generico "problema tecnico".
         console.error(`Strumento ${c.name} fallito:`, e);
         if (diag) (diag.errori = diag.errori || []).push(`${c.name}: ${e.message}`);
-        esiti.push({
+        return {
           type: 'tool_result', tool_use_id: c.id, is_error: true,
           content: `Strumento fallito: ${e.message}`,
-        });
+        };
       }
-    }
+    }));
     messages.push({ role: 'user', content: esiti });
   }
 

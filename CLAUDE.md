@@ -126,6 +126,14 @@ codice, quindi `VISIBILITA_PORTA = 'interno'` e si vedono tutte e tre le fonti (
 strumenti). Con il codice tolto sarebbero 11: le fonti interne **non verrebbero
 caricate**, non filtrate dopo.
 
+### Tempi
+
+`api/mitl.js` può durare fino a **300 secondi** (`vercel.json`, dal 17/09/2026;
+prima 60). Serve da quando MARLA legge i documenti FOIA: una domanda aperta che
+ne apre parecchi superava i 60 secondi e finiva in un 504 senza risposta. 300 è
+il massimo del piano Hobby di Vercel con Fluid Compute. Le chiamate agli
+strumenti di uno stesso turno partono in parallelo.
+
 ### Se il chatbot si blocca
 
 Sotto ogni risposta c'è una riga con fonti consultate, motivo dell'interruzione ed
@@ -151,7 +159,7 @@ strumento — se il tetto scatta lì, la chiamata resta troncata e il giro si pe
   Archive"**, dove foia.nodes carica gli allegati: se `foia_documenti` risponde
   "documento non leggibile sul Drive", è lì che manca il permesso. Ogni chiamata
   a Google ha un tempo massimo di 15 secondi, così un Google lento non fa
-  scadere i 60 secondi della funzione.
+  scadere la funzione.
   La chiave privata si copia da `service-account.json` per intero, da
   `-----BEGIN PRIVATE KEY-----` a `-----END PRIVATE KEY-----`, lasciando le
   sequenze di escape a-capo così come sono (nel file appaiono come barra + n):

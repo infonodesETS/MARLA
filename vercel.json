@@ -5,7 +5,7 @@
       "maxDuration": 30
     },
     "api/mitl.js": {
-      "maxDuration": 60
+      "maxDuration": 300
     }
   },
   "headers": [

@@ -49,10 +49,11 @@ async function motivo(res) {
   }
 }
 
-// Ogni chiamata a Google ha un tempo massimo. MARLA ha 60 secondi in tutto per
-// rispondere (vercel.json): una richiesta a Google rimasta appesa — succede, nei
-// collaudi una ha impiegato 50 secondi — la farebbe fallire per intero. Meglio
-// uno strumento che dice "Google non risponde" e una risposta che lo riporta.
+// Ogni chiamata a Google ha un tempo massimo. MARLA ha un tempo limitato per
+// rispondere (maxDuration in vercel.json), e leggere documenti lo consuma in
+// fretta: una richiesta a Google rimasta appesa — succede, nei collaudi una ha
+// impiegato 50 secondi — la farebbe fallire per intero. Meglio uno strumento
+// che dice "Google non risponde" e una risposta che lo riporta.
 const TEMPO_MAX_MS = 15 * 1000;
 
 async function chiama(url, opzioni = {}) {
